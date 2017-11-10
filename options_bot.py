@@ -22,8 +22,8 @@ for i in range(80,121):
     curr_put = str('T' + str(i) + 'P')
     calls.add(curr_call)
     puts.add(curr_put)
-    tickers[curr_call] = {'price': [], 'delta': [], 'gamma': [], 'vega': []}
-    tickers[curr_put] = {'price': [], 'delta': [], 'gamma': [], 'vega': []}
+    tickers[curr_call] = {'price': [], 'delta': [], 'gamma': [], 'vega': [], 'vol': []}
+    tickers[curr_put] = {'price': [], 'delta': [], 'gamma': [], 'vega': [], 'vol': []}
 
 
 def on_update(msg,order):
@@ -51,20 +51,26 @@ def on_update(msg,order):
             theo_p = black_scholes.black_scholes(flag,S,K,t,r,iv)
             delta = analytical.delta(flag,S,K,t,r,iv)
             gamma = analytical.gamma(flag,S,K,t,r,iv)
-            vega = analytical.vega(flag,S,K,t,r,iv)
+            # vega = analytical.vega(flag,S,K,t,r,iv)
+            tickers[tck]['vol'].append(vol)
             tickers[tck]['delta'].append(delta)
             tickers[tck]['gamma'].append(gamma)
-            tickers[tck]['vega'].append(vega)
+            # tickers[tck]['vega'].append(vega)
+
+            if len(tickers[tck]['vol']) > 5:
+                vol_sma = np.mean(np.array(ticker[tck]['vol'][-6:-1]))
+                if abs(iv - vol_sma)/vol_sma > .015:
+                    if iv > vol_sma: order.addSell(tck,10,last_price+dx)
+                    else: order.addBuy(tck,10,last_price-dx)
+
         except:
             print(S, K, last_price, flag)
-            order.addBuy(tck,10,last_price-dx)
-        # print('Implied Vol = ', iv, 'Theoretical price = ', theo_p, 'Actual Price = ', last_price)
-    # else:
-        # print(tick)
 
-    # print(time.time() - now)
 
-    # print(tck,last_price)
+def curr_pos(msg,order):
+    ts = msg['trader_state']
+    cash = ts['cash']
+    pos = ts['positions']
 
 
 def trade(msg,order):
@@ -95,4 +101,5 @@ def black_scholes_put(S,K,t,T,r,sigma):
 
 t.onMarketUpdate = on_update
 t.onTrade = trade
+t.onTraderUpdate = curr_pos
 t.run()
